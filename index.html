@@ -35,7 +35,7 @@
                     try {
                         // Jika single_match=True, maka len(matches) == 1 dan <iframe> muncul
                         // window.length akan bernilai 1.
-                        if (win.length === 1) {
+                        if (win.length === 3) {
                             win.close();
                             resolve(true);
                         } else {
@@ -47,7 +47,7 @@
                         win.close();
                         resolve(false);
                     }
-                }, 800); 
+                }, 2000); 
             });
         }
 
